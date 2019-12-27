@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #define NEWBUF {NULL, 0, 0}
 #define BUFFADD 20
@@ -64,15 +65,12 @@ typedef struct
 
 str* lines = NULL;
 int numlines = 0;
+int lmem = 0;
 
 int readlines()
 {
 	char c;
 	buffer buf = NEWBUF;
-
-	lines = malloc(BUFFADD*sizeof(str));
-	if (lines == NULL) return MEM_ERROR;
-	int lmem = BUFFADD;
 
 	c = getc(stdin);
 
@@ -133,6 +131,8 @@ int Max = 0;
 char *Word = NULL;
 int Count = 0;
 
+int eof = 0;
+
 void *body(void *args)
 {  
     Thread_params *params = (Thread_params *)args;
@@ -171,7 +171,7 @@ void *body(void *args)
 
             for (i = 0; i <= line.len; i++)
             {
-                if (i == line.len || line.chars[i] == ' ')
+                if (i == line.len || (line.chars[i] == ' ' && buf.len > 0))
                 {
                 	endbuf(&buf);
 
@@ -213,7 +213,14 @@ void *body(void *args)
     }
 
     return NULL;
+}
 
+void *readerbody(void *args)
+{
+	readlines();
+	eof = 1;
+
+	return NULL;
 }
 
 int main(int argc,char **argv)
@@ -224,6 +231,7 @@ int main(int argc,char **argv)
     int current_index = 0;
 
     pthread_t *threads = NULL;
+    pthread_t reader;
 
     if (argc < 2)
     {
@@ -238,11 +246,6 @@ int main(int argc,char **argv)
         return 1;
     }
 
-    // neponyatno
-    readlines();
-
-
-
     threads = (pthread_t *)malloc(sizeof(pthread_t)*num_threads);
     if (threads == NULL)
     {
@@ -254,78 +257,91 @@ int main(int argc,char **argv)
     {
         return 2;
     }
-    
-    for (i = 0; i < num_threads; i++)
+
+    if (pthread_create(&reader, NULL, readerbody, NULL) == -1)
     {
-        if (pthread_mutex_init(&thread_params[i].mut, NULL) == -1)
-        {
-            return 3;
-        }
-
-        if (pthread_cond_init(&thread_params[i].cond, NULL) == -1)
-        {
-            return 3;
-        }
-
-        thread_params[i].index = 0;
-        thread_params[i].state = UNKNOWN;
-
-        if (pthread_create(&threads[i], NULL, body, &thread_params[i]) == -1)
-        {
-            return 3;
-        }
+    	return 3;
     }
 
-    while (1)
-    {
-        if (current_index == numlines)
-        {
-            break;
-        }
+    while (!eof)
+    {    
+    	sleep(10);
+    	current_index--;
+    	if (current_index < 0) current_index = 0;
+    	printf("checking...\n");
+	    for (i = 0; i < num_threads; i++)
+	    {
+	        if (pthread_mutex_init(&thread_params[i].mut, NULL) == -1)
+	        {
+	            return 3;
+	        }
 
-        for (i = 0; i < num_threads; i++)
-        {
-        	
-            pthread_mutex_lock(&thread_params[i].mut);
+	        if (pthread_cond_init(&thread_params[i].cond, NULL) == -1)
+	        {
+	            return 3;
+	        }
 
-            if (thread_params[i].state == READY)
-            {
-                if (current_index == numlines)
-                {
-                    thread_params[i].state = FINISH;
-                    finish_counter++;
-                }
-                else
-                {
-                    thread_params[i].index = current_index;
-                    thread_params[i].state = MUL;
-                    current_index++;
-                }
+	        thread_params[i].index = 0;
+	        thread_params[i].state = UNKNOWN;
 
-                pthread_cond_signal(&thread_params[i].cond);
-                
-                
-            }
-            pthread_mutex_unlock(&thread_params[i].mut);
-                
-        } /* end for */
-    } /* end  while */
+	        if (pthread_create(&threads[i], NULL, body, &thread_params[i]) == -1)
+	        {
+	            return 3;
+	        }
+	    }
 
-    while (finish_counter < num_threads)
-    {
-        for (i = 0; i < num_threads; i++)
-        {
-            pthread_mutex_lock(&thread_params[i].mut);
-            if (thread_params[i].state == READY)
-            {
-                thread_params[i].state = FINISH;
-                pthread_cond_signal(&thread_params[i].cond);
-                finish_counter++;
-            }
-            pthread_mutex_unlock(&thread_params[i].mut);
-        }
-    }
+	    while (1)
+	    {
+	        if (current_index == numlines)
+	        {
+	            break;
+	        }
 
+	        for (i = 0; i < num_threads; i++)
+	        {
+	        	
+	            pthread_mutex_lock(&thread_params[i].mut);
+
+	            if (thread_params[i].state == READY)
+	            {
+	                if (current_index == numlines)
+	                {
+	                    thread_params[i].state = FINISH;
+	                    finish_counter++;
+	                }
+	                else
+	                {
+	                    thread_params[i].index = current_index;
+	                    thread_params[i].state = MUL;
+	                    current_index++;
+	                }
+
+	                pthread_cond_signal(&thread_params[i].cond);
+	                
+	                
+	            }
+	            pthread_mutex_unlock(&thread_params[i].mut);
+	                
+	        } /* end for */
+	    } /* end  while */
+
+	    while (finish_counter < num_threads)
+	    {
+	        for (i = 0; i < num_threads; i++)
+	        {
+	            pthread_mutex_lock(&thread_params[i].mut);
+	            if (thread_params[i].state == READY)
+	            {
+	                thread_params[i].state = FINISH;
+	                pthread_cond_signal(&thread_params[i].cond);
+	                finish_counter++;
+	            }
+	            pthread_mutex_unlock(&thread_params[i].mut);
+	        }
+	    }
+	    printf("done checking...\n");
+	}
+	pthread_join(reader, NULL);
     for (i = 0; i < num_threads; i++)
     {
             pthread_join(threads[i], NULL);
