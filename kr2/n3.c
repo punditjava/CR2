@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
 
 #define NEWBUF {NULL, 0, 0}
 #define BUFFADD 20
@@ -133,7 +134,8 @@ char *Word = NULL;
 int Count = 0;
 
 int eof = 0;
-int go = 0;
+int start;
+int curr;
 
 void *body(void *args)
 {  
@@ -221,14 +223,9 @@ void *readerbody(void *args)
 {
 	readlines();
 	eof = 1;
-
 	return NULL;
 }
 
-void handler(int sig)
-{
-	go = 1;
-}
 
 int main(int argc,char **argv)
 {
@@ -271,13 +268,14 @@ int main(int argc,char **argv)
     	return 3;
     }
 
+    start = clock();
 
-    signal(SIGALARM, handler);
 
     while (!eof)
     {    
-    	alarm(10);
-    	if (go)
+    	curr = clock();
+
+    	if ((float)(curr - start) /CLOCKS_PER_SEC >= 10)
     	{
 	    	current_index--;
 	    	if (current_index < 0) current_index = 0;
@@ -353,11 +351,12 @@ int main(int argc,char **argv)
 		        }
 		    }
 		    printf("done checking...\n");
-		    go = 0;
+		    start = clock();
 		}
 	}
 
 	pthread_join(reader, NULL);
+
 
     for (i = 0; i < num_threads; i++)
     {
