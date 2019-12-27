@@ -277,6 +277,7 @@ int main(int argc,char **argv)
 
     	if ((float)(curr - start) /CLOCKS_PER_SEC >= 10)
     	{
+    		finish_counter = 0;
 	    	current_index--;
 	    	if (current_index < 0) current_index = 0;
 	    	printf("checking...\n");
@@ -350,7 +351,6 @@ int main(int argc,char **argv)
 		            pthread_mutex_unlock(&thread_params[i].mut);
 		        }
 		    }
-		    printf("done checking...\n");
 		    start = clock();
 		}
 	}
