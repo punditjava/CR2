@@ -25,7 +25,6 @@ int append(buffer *buf, char* s, int l)
 		if (buf->len > buf->mem)
 		{
 			buf->mem += BUFFADD;
-			printf("r1 ");
 			buf->chars = (char*)realloc(buf->chars, buf->mem);
 
 			if (buf->chars == NULL) return MEM_ERROR;
@@ -40,7 +39,6 @@ int append(buffer *buf, char* s, int l)
 int endbuf(buffer *buf)
 {
 	char *tmp = NULL;
-	printf("r2 ");
 	tmp = (char*)realloc(buf->chars, (buf->len + 1)*sizeof(char));
 	if (tmp == NULL) return MEM_ERROR;
 
@@ -87,7 +85,6 @@ int readlines()
 			if (numlines + 1 > lmem)
 			{
 				lmem += BUFFADD;
-				printf("r3 ");
 				lines = realloc(lines, lmem * sizeof(str));
 				if (lines == NULL) return MEM_ERROR;
 			}
@@ -101,7 +98,7 @@ int readlines()
 		
 		c = getc(stdin);
 	}
-	
+
 	if (buf.len > 0)
 	{
 		endbuf(&buf);
@@ -183,12 +180,14 @@ void *body(void *args)
                 		max = buf.len;
                 		if (word != NULL) free(word);
                 		word = buf.chars;
-                		count = 0;
+                		count = 1;
                 	}
                 	else if (max == buf.len && !strcmp(word, buf.chars))
                 	{
                 		count++;
                 	}
+
+                	resetbuf(&buf);
                 }
                 else append(&buf, &line.chars[i], 1);
             }
@@ -198,7 +197,7 @@ void *body(void *args)
             	Max = max;
             	if (Word != NULL) free(Word);
             	Word = word;
-            	Count = 0;
+            	Count = 1;
             }
             else if (Max == max && !strcmp(Word, word))
             {
@@ -300,11 +299,12 @@ int main(int argc,char **argv)
                 {
                     thread_params[i].index = current_index;
                     thread_params[i].state = MUL;
+                    current_index++;
                 }
 
                 pthread_cond_signal(&thread_params[i].cond);
                 
-                current_index++;
+                
             }
             pthread_mutex_unlock(&thread_params[i].mut);
                 
@@ -325,7 +325,7 @@ int main(int argc,char **argv)
             pthread_mutex_unlock(&thread_params[i].mut);
         }
     }
-printf("4\n");
+
     for (i = 0; i < num_threads; i++)
     {
             pthread_join(threads[i], NULL);
@@ -336,7 +336,7 @@ printf("4\n");
     free(threads);
     free(thread_params);
 
-    printf("%s\n%d\n%d\n", Word, Max, Count + 1);
+    printf("Longest word - \t%s\nwith length of \t%d\nencounteres \t%d\n", Word, Max, Count);
 
     return 0;
 }
